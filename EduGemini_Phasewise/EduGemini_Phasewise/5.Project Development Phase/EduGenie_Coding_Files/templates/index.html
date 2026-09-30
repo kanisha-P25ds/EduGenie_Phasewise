@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EduGenie</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}" />
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to EduGenie 🧞✨</h1>
+    <p class="tagline">Your personal AI tutor for learning support!</p>
+
+    <!-- Q&A -->
+    <form id="qaForm">
+      <label><strong>Ask EduGenie a Question:</strong></label><br><br>
+      <input type="text" id="question" placeholder="Why is the sky blue?" required>
+      <button type="submit">Get Answer</button>
+    </form>
+    <div id="qaResult" class="output"></div>
+
+    <!-- Explanation -->
+    <form id="explainForm">
+      <label><strong>Need an Explanation?</strong></label><br><br>
+      <input type="text" id="topic" placeholder="Photosynthesis" required>
+      <button type="submit">Explain</button>
+    </form>
+    <div id="explanationResult" class="output"></div>
+
+    <!-- Summary -->
+    <form id="summaryForm">
+      <label><strong>Summarize a Paragraph:</strong></label><br><br>
+      <input type="text" id="summaryText" placeholder="Paste long content to summarize" required>
+      <button type="submit">Summarize</button>
+    </form>
+    <div id="summaryResult" class="output"></div>
+
+    <!-- Quiz -->
+    <form id="quizForm">
+      <label><strong>Generate a Quiz:</strong></label><br><br>
+      <input type="text" id="quizText" placeholder="Solar System" required>
+      <button type="submit">Generate Quiz</button>
+    </form>
+    <div id="quizResult" class="output"></div>
+
+    <!-- Learning Path -->
+    <form id="learnForm">
+      <label><strong>Get Learning Recommendations:</strong></label><br><br>
+      <input type="text" id="learnTopic" placeholder="e.g. Linear Regression" required>
+      <button type="submit">Get Recommendations</button>
+    </form>
+    <div id="learnResult" class="output"></div>
+  </div>
+
+  <script>
+    // ---------- Q&A ----------
+    document.getElementById("qaForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = document.getElementById("question").value;
+      const resultDiv = document.getElementById("qaResult");
+      resultDiv.innerHTML = "Thinking...";
+      try {
+        const res = await fetch(`/qa?question=${encodeURIComponent(question)}`);
+        const data = await res.json();
+        resultDiv.innerHTML = `<strong>Answer:</strong><br>${data.answer}`;
+      } catch (err) {
+        resultDiv.innerHTML = "⚠ Something went wrong.";
+      }
+    });
+
+    // ---------- Explanation ----------
+    document.getElementById("explainForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const topic = document.getElementById("topic").value;
+      const resultDiv = document.getElementById("explanationResult");
+      resultDiv.innerHTML = "Generating explanation...";
+      try {
+        const res = await fetch("/explain/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic })
+        });
+        const data = await res.json();
+        resultDiv.innerHTML = `<strong>Explanation:</strong><br>${data.explanation || data.error}`;
+      } catch (err) {
+        resultDiv.innerHTML = "⚠ Something went wrong.";
+      }
+    });
+
+    // ---------- Summary ----------
+    document.getElementById("summaryForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = document.getElementById("summaryText").value;
+      const resultDiv = document.getElementById("summaryResult");
+      resultDiv.innerHTML = "Summarizing...";
+      try {
+        const res = await fetch("/summarize/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        resultDiv.innerHTML = `<strong>Summary:</strong><br>${data.summary || data.error}`;
+      } catch (err) {
+        resultDiv.innerHTML = "⚠ Something went wrong.";
+      }
+    });
+
+    // ---------- Quiz ----------
+    document.getElementById("quizForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = document.getElementById("quizText").value;
+      const resultDiv = document.getElementById("quizResult");
+      resultDiv.innerHTML = "Generating quiz...";
+      try {
+        const res = await fetch("/quiz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        renderQuiz(data.quiz, resultDiv);
+      } catch (err) {
+        resultDiv.innerHTML = "⚠ Something went wrong.";
+      }
+    });
+
+    function renderQuiz(quiz, container) {
+      if (!Array.isArray(quiz) || quiz[0]?.error) {
+        container.innerHTML = `⚠ ${quiz?.[0]?.error || "Could not generate quiz."}`;
+        return;
+      }
+
+      container.innerHTML = "<strong>Quiz:</strong>";
+      quiz.forEach((q, i) => {
+        const qBlock = document.createElement("div");
+        qBlock.className = "quiz-question";
+        qBlock.innerHTML = `
+          <p><strong>Q${i + 1}:</strong> ${q.question}</p>
+          ${q.options.map((opt, j) => `
+            <label>
+              <input type="radio" name="q${i}" value="${opt}"> ${opt}
+            </label><br>
+          `).join("")}
+          <button type="button" class="check-btn" data-index="${i}">Check Answer</button>
+          <p class="feedback" id="feedback${i}"></p>
+        `;
+        container.appendChild(qBlock);
+      });
+
+      container.querySelectorAll(".check-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const i = btn.dataset.index;
+          const selected = container.querySelector(`input[name="q${i}"]:checked`);
+          const feedback = document.getElementById(`feedback${i}`);
+          if (!selected) {
+            feedback.innerHTML = "Please select an option.";
+            return;
+          }
+          if (selected.value === quiz[i].answer) {
+            feedback.innerHTML = "✅ Correct!";
+            feedback.style.color = "green";
+          } else {
+            feedback.innerHTML = `❌ Incorrect. Correct answer: ${quiz[i].answer}`;
+            feedback.style.color = "red";
+          }
+        });
+      });
+    }
+
+    // ---------- Learning Path ----------
+    document.getElementById("learnForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const topic = document.getElementById("learnTopic").value;
+      const resultDiv = document.getElementById("learnResult");
+      resultDiv.innerHTML = "Building your learning path...";
+      try {
+        const res = await fetch(`/learn/recommendations?topic=${encodeURIComponent(topic)}`);
+        const data = await res.json();
+        resultDiv.innerHTML = `<strong>Learning Recommendations for "${data.topic}":</strong><br><pre>${data.recommendation}</pre>`;
+      } catch (err) {
+        resultDiv.innerHTML = "⚠ Something went wrong.";
+      }
+    });
+  </script>
+</body>
+</html>
